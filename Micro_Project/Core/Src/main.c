@@ -22,7 +22,7 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
+#include "BMP180.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -52,10 +52,12 @@ DMA_HandleTypeDef hdma_usart2_rx;
 
 /* USER CODE BEGIN PV */
 
+float Temperature						;
 uint8_t mode_select 		   	    =  0;
 uint8_t lower_limit 		  	    = 20;
 uint8_t upper_limit 		  	    = 21;
 uint8_t Rx_data[8]						;
+uint8_t combi_state 			   	 = 0;
 volatile uint32_t tick_counter	 	=  0;
 
 /* USER CODE END PV */
@@ -76,86 +78,7 @@ void MX_USB_HOST_Process(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////B
-//uint8_t Rh_byte1, Rh_byte2, Temp_byte1, Temp_byte2;
-//uint16_t SUM, RH, TEMP;
-//
-//float Temperature = 0;
-//float Humidity = 0;
-//uint8_t Presence = 0;
-//
-//void Set_Pin_Output (GPIO_TypeDef *GPIOx, uint16_t GPIO_Pin)
-//{
-//	GPIO_InitTypeDef GPIO_InitStruct = {0};
-//	GPIO_InitStruct.Pin = GPIO_Pin;
-//	GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
-//	GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-//	HAL_GPIO_Init(GPIOx, &GPIO_InitStruct);
-//}
-//
-//void Set_Pin_Input (GPIO_TypeDef *GPIOx, uint16_t GPIO_Pin)
-//{
-//	GPIO_InitTypeDef GPIO_InitStruct = {0};
-//	GPIO_InitStruct.Pin = GPIO_Pin;
-//	GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
-//	GPIO_InitStruct.Pull = GPIO_PULLUP;
-//	HAL_GPIO_Init(GPIOx, &GPIO_InitStruct);
-//}
-//
-//
-///*********************************** DHT22 FUNCTIONS ****************************************/
-//
-//#define DHT22_PORT GPIOA
-//#define DHT22_PIN GPIO_PIN_1
-//
-//void DHT22_Start (void)
-//{
-//	Set_Pin_Output(DHT22_PORT, DHT22_PIN); // set the pin as output
-//	HAL_GPIO_WritePin (DHT22_PORT, DHT22_PIN, 0);   // pull the pin low
-//	HAL_Delay(1200);   // wait for > 1ms
-//
-//	HAL_GPIO_WritePin (DHT22_PORT, DHT22_PIN, 1);   // pull the pin high
-//	HAL_Delay(30);   // wait for 30us
-//
-//	Set_Pin_Input(DHT22_PORT, DHT22_PIN);   // set as input
-//}
-//
-//uint8_t DHT22_Check_Response (void)
-//{
-//	Set_Pin_Input(DHT22_PORT, DHT22_PIN);   // set as input
-//	uint8_t Response = 0;
-//	HAL_Delay(40);  // wait for 40us
-//	if (!(HAL_GPIO_ReadPin (DHT22_PORT, DHT22_PIN))) // if the pin is low
-//	{
-//		HAL_Delay(80);   // wait for 80us
-//
-//		if ((HAL_GPIO_ReadPin (DHT22_PORT, DHT22_PIN))) Response = 1;  // if the pin is high, response is ok
-//		else Response = -1;
-//	}
-//
-//	while ((HAL_GPIO_ReadPin (DHT22_PORT, DHT22_PIN)));   // wait for the pin to go low
-//	return Response;
-//}
-//
-//uint8_t DHT22_Read (void)
-//{
-//	uint8_t i,j;
-//	for (j=0;j<8;j++)
-//	{
-//		while (!(HAL_GPIO_ReadPin (DHT22_PORT, DHT22_PIN)));   // wait for the pin to go high
-//		HAL_Delay(40);   // wait for 40 us
-//
-//		if (!(HAL_GPIO_ReadPin (DHT22_PORT, DHT22_PIN)))   // if the pin is low
-//		{
-//			i&= ~(1<<(7-j));   // write 0
-//		}
-//		else i|= (1<<(7-j));  // if the pin is high, write 1
-//		while ((HAL_GPIO_ReadPin (DHT22_PORT, DHT22_PIN)));  // wait for the pin to go low
-//	}
-//
-//	return i;
-//}
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////E
+
 /* USER CODE END 0 */
 
 /**
@@ -193,7 +116,9 @@ int main(void)
   MX_USB_HOST_Init();
   MX_USART2_UART_Init();
   /* USER CODE BEGIN 2 */
-
+  /* bmp180 ve uart it sini baslat */
+  BMP180_Start();
+  HAL_UART_Receive_IT(&huart2, Rx_data, 3);
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -205,44 +130,57 @@ int main(void)
 
     /* USER CODE BEGIN 3 */
 
-    if(!mode_select)
+    uint8_t data[3] = "";
+    /* sicaklik verisini oku */
+    Temperature = BMP180_GetTemp();
+//    uint8_t temperature = 0;
+//    temperature = (int)Temperature;
+//    sprintf(data, "%d", temperature + 300);
+//    HAL_UART_Transmit (&huart2, data, sizeof (data), 10);
+
+    /* kombinin acik olup olmadigini kontrol et */
+    if(combi_state)
     {
+    	/* kombinin acik oldugunu ilet */
+    	uint8_t dataon[1] = "a";
+    	HAL_UART_Transmit (&huart2, dataon, sizeof (dataon), 10);
+    }
+    else
+    {
+    	/* kombinin kapali oldugunu ilet */
+    	uint8_t dataoff[1] = "b";
+    	HAL_UART_Transmit (&huart2, dataoff, sizeof (dataoff), 10);
+    }
+    HAL_Delay(200);
+
+    /* mode u kontrol et */
+    if(!mode_select)
+    {   /* mode a gore ledleri binary olarak kaydet */
     	HAL_GPIO_WritePin(LD4_GPIO_Port, LD4_Pin, ((lower_limit - 20) & 0x01));
     	HAL_GPIO_WritePin(LD6_GPIO_Port, LD6_Pin, ((lower_limit - 20) & 0x02));
     	HAL_GPIO_WritePin(LD5_GPIO_Port, LD5_Pin, ((lower_limit - 20) & 0x04));
     }
     else
     {
+    	/* mode a gore ledleri binary olarak kaydet */
     	HAL_GPIO_WritePin(LD4_GPIO_Port, LD4_Pin, ((upper_limit - 21) & 0x01));
     	HAL_GPIO_WritePin(LD6_GPIO_Port, LD6_Pin, ((upper_limit - 21) & 0x02));
     	HAL_GPIO_WritePin(LD5_GPIO_Port, LD5_Pin, ((upper_limit - 21) & 0x04));
     }
 
-    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////B
-//    HAL_Delay(100);
-//    HAL_UART_Receive_DMA(&huart2, Rx_data, 10);
-//    HAL_Delay(100);
-//
-//    DHT22_Start();
-//    Presence = DHT22_Check_Response();
-//    Rh_byte1 = DHT22_Read ();
-//    Rh_byte2 = DHT22_Read ();
-//    Temp_byte1 = DHT22_Read ();
-//    Temp_byte2 = DHT22_Read ();
-//    SUM = DHT22_Read();
-//
-//    TEMP = ((Temp_byte1<<8)|Temp_byte2);
-//    RH = ((Rh_byte1<<8)|Rh_byte2);
-//
-//    Temperature = (float) (TEMP/10.0);
-//    Humidity = (float) (RH/10.0);
-
-    if(HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_0))
+    /* sicaklik alt limitin altindaysa kombiyi ac */
+    if(Temperature < lower_limit)
     {
-    	//HAL_UART_Transmit (&huart2, "gonderilecek data", sizeof ("gonderilecek data"), 10);
-    	//__HAL_GPIO_EXTI_GENERATE_SWIT(BUTTON2_Pin);
+    	HAL_GPIO_WritePin(GPIOE, GPIO_PIN_15, SET);
+    	combi_state = 1;
     }
-    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////E
+    /* sicaklik ust limitin ustundeyse kombiyi kapat */
+    if(Temperature > upper_limit)
+    {
+    	HAL_GPIO_WritePin(GPIOE, GPIO_PIN_15, RESET);
+    	combi_state = 0;
+    }
+
   }
   /* USER CODE END 3 */
 }
@@ -308,7 +246,7 @@ static void MX_I2C1_Init(void)
 
   /* USER CODE END I2C1_Init 1 */
   hi2c1.Instance = I2C1;
-  hi2c1.Init.ClockSpeed = 100000;
+  hi2c1.Init.ClockSpeed = 400000;
   hi2c1.Init.DutyCycle = I2C_DUTYCYCLE_2;
   hi2c1.Init.OwnAddress1 = 0;
   hi2c1.Init.AddressingMode = I2C_ADDRESSINGMODE_7BIT;
@@ -414,7 +352,7 @@ static void MX_USART2_UART_Init(void)
 
   /* USER CODE END USART2_Init 1 */
   huart2.Instance = USART2;
-  huart2.Init.BaudRate = 9600;
+  huart2.Init.BaudRate = 115200;
   huart2.Init.WordLength = UART_WORDLENGTH_8B;
   huart2.Init.StopBits = UART_STOPBITS_1;
   huart2.Init.Parity = UART_PARITY_NONE;
@@ -586,7 +524,7 @@ HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 					lower_limit = 20;
 				}
 
-				/* ust limitin alt limitten uyuk olmasini sagla */
+				/* ust limitin alt limitten buyuk olmasini sagla */
 				if(upper_limit <= lower_limit)
 				{
 					upper_limit = lower_limit + 1;
@@ -613,6 +551,26 @@ HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 		/* tekrardan olcum yapabilmek icin tick i kaydet */
 		tick_counter = HAL_GetTick();
 	}
+}
+
+void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
+{
+	/* interrupti tekrardan aktiflestir */
+	HAL_UART_Receive_IT(&huart2, Rx_data, 3);
+	/* hangi limit oldugunu kontrol et */
+	if((Rx_data[0] - '0') == 1)
+	{
+		/* char dan int e donustur */
+		lower_limit = (Rx_data[1] - '0') * 10;
+		lower_limit += (Rx_data[2] - '0');
+	}
+	if((Rx_data[0] - '0') == 2)
+	{
+		/* char dan int e donustur */
+		upper_limit = (Rx_data[1] - '0') * 10;
+		upper_limit += (Rx_data[2] - '0');
+	}
+
 }
 /* USER CODE END 4 */
 
