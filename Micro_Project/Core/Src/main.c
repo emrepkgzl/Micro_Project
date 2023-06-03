@@ -51,7 +51,13 @@ UART_HandleTypeDef huart2;
 DMA_HandleTypeDef hdma_usart2_rx;
 
 /* USER CODE BEGIN PV */
-uint8_t Rx_data[8];
+
+uint8_t mode_select 		   	    =  0;
+uint8_t lower_limit 		  	    = 20;
+uint8_t upper_limit 		  	    = 21;
+uint8_t Rx_data[8]						;
+volatile uint32_t tick_counter	 	=  0;
+
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -71,84 +77,84 @@ void MX_USB_HOST_Process(void);
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////B
-uint8_t Rh_byte1, Rh_byte2, Temp_byte1, Temp_byte2;
-uint16_t SUM, RH, TEMP;
-
-float Temperature = 0;
-float Humidity = 0;
-uint8_t Presence = 0;
-
-void Set_Pin_Output (GPIO_TypeDef *GPIOx, uint16_t GPIO_Pin)
-{
-	GPIO_InitTypeDef GPIO_InitStruct = {0};
-	GPIO_InitStruct.Pin = GPIO_Pin;
-	GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
-	GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-	HAL_GPIO_Init(GPIOx, &GPIO_InitStruct);
-}
-
-void Set_Pin_Input (GPIO_TypeDef *GPIOx, uint16_t GPIO_Pin)
-{
-	GPIO_InitTypeDef GPIO_InitStruct = {0};
-	GPIO_InitStruct.Pin = GPIO_Pin;
-	GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
-	GPIO_InitStruct.Pull = GPIO_PULLUP;
-	HAL_GPIO_Init(GPIOx, &GPIO_InitStruct);
-}
-
-
-/*********************************** DHT22 FUNCTIONS ****************************************/
-
-#define DHT22_PORT GPIOA
-#define DHT22_PIN GPIO_PIN_1
-
-void DHT22_Start (void)
-{
-	Set_Pin_Output(DHT22_PORT, DHT22_PIN); // set the pin as output
-	HAL_GPIO_WritePin (DHT22_PORT, DHT22_PIN, 0);   // pull the pin low
-	HAL_Delay(1200);   // wait for > 1ms
-
-	HAL_GPIO_WritePin (DHT22_PORT, DHT22_PIN, 1);   // pull the pin high
-	HAL_Delay(30);   // wait for 30us
-
-	Set_Pin_Input(DHT22_PORT, DHT22_PIN);   // set as input
-}
-
-uint8_t DHT22_Check_Response (void)
-{
-	Set_Pin_Input(DHT22_PORT, DHT22_PIN);   // set as input
-	uint8_t Response = 0;
-	HAL_Delay(40);  // wait for 40us
-	if (!(HAL_GPIO_ReadPin (DHT22_PORT, DHT22_PIN))) // if the pin is low
-	{
-		HAL_Delay(80);   // wait for 80us
-
-		if ((HAL_GPIO_ReadPin (DHT22_PORT, DHT22_PIN))) Response = 1;  // if the pin is high, response is ok
-		else Response = -1;
-	}
-
-	while ((HAL_GPIO_ReadPin (DHT22_PORT, DHT22_PIN)));   // wait for the pin to go low
-	return Response;
-}
-
-uint8_t DHT22_Read (void)
-{
-	uint8_t i,j;
-	for (j=0;j<8;j++)
-	{
-		while (!(HAL_GPIO_ReadPin (DHT22_PORT, DHT22_PIN)));   // wait for the pin to go high
-		HAL_Delay(40);   // wait for 40 us
-
-		if (!(HAL_GPIO_ReadPin (DHT22_PORT, DHT22_PIN)))   // if the pin is low
-		{
-			i&= ~(1<<(7-j));   // write 0
-		}
-		else i|= (1<<(7-j));  // if the pin is high, write 1
-		while ((HAL_GPIO_ReadPin (DHT22_PORT, DHT22_PIN)));  // wait for the pin to go low
-	}
-
-	return i;
-}
+//uint8_t Rh_byte1, Rh_byte2, Temp_byte1, Temp_byte2;
+//uint16_t SUM, RH, TEMP;
+//
+//float Temperature = 0;
+//float Humidity = 0;
+//uint8_t Presence = 0;
+//
+//void Set_Pin_Output (GPIO_TypeDef *GPIOx, uint16_t GPIO_Pin)
+//{
+//	GPIO_InitTypeDef GPIO_InitStruct = {0};
+//	GPIO_InitStruct.Pin = GPIO_Pin;
+//	GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+//	GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+//	HAL_GPIO_Init(GPIOx, &GPIO_InitStruct);
+//}
+//
+//void Set_Pin_Input (GPIO_TypeDef *GPIOx, uint16_t GPIO_Pin)
+//{
+//	GPIO_InitTypeDef GPIO_InitStruct = {0};
+//	GPIO_InitStruct.Pin = GPIO_Pin;
+//	GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+//	GPIO_InitStruct.Pull = GPIO_PULLUP;
+//	HAL_GPIO_Init(GPIOx, &GPIO_InitStruct);
+//}
+//
+//
+///*********************************** DHT22 FUNCTIONS ****************************************/
+//
+//#define DHT22_PORT GPIOA
+//#define DHT22_PIN GPIO_PIN_1
+//
+//void DHT22_Start (void)
+//{
+//	Set_Pin_Output(DHT22_PORT, DHT22_PIN); // set the pin as output
+//	HAL_GPIO_WritePin (DHT22_PORT, DHT22_PIN, 0);   // pull the pin low
+//	HAL_Delay(1200);   // wait for > 1ms
+//
+//	HAL_GPIO_WritePin (DHT22_PORT, DHT22_PIN, 1);   // pull the pin high
+//	HAL_Delay(30);   // wait for 30us
+//
+//	Set_Pin_Input(DHT22_PORT, DHT22_PIN);   // set as input
+//}
+//
+//uint8_t DHT22_Check_Response (void)
+//{
+//	Set_Pin_Input(DHT22_PORT, DHT22_PIN);   // set as input
+//	uint8_t Response = 0;
+//	HAL_Delay(40);  // wait for 40us
+//	if (!(HAL_GPIO_ReadPin (DHT22_PORT, DHT22_PIN))) // if the pin is low
+//	{
+//		HAL_Delay(80);   // wait for 80us
+//
+//		if ((HAL_GPIO_ReadPin (DHT22_PORT, DHT22_PIN))) Response = 1;  // if the pin is high, response is ok
+//		else Response = -1;
+//	}
+//
+//	while ((HAL_GPIO_ReadPin (DHT22_PORT, DHT22_PIN)));   // wait for the pin to go low
+//	return Response;
+//}
+//
+//uint8_t DHT22_Read (void)
+//{
+//	uint8_t i,j;
+//	for (j=0;j<8;j++)
+//	{
+//		while (!(HAL_GPIO_ReadPin (DHT22_PORT, DHT22_PIN)));   // wait for the pin to go high
+//		HAL_Delay(40);   // wait for 40 us
+//
+//		if (!(HAL_GPIO_ReadPin (DHT22_PORT, DHT22_PIN)))   // if the pin is low
+//		{
+//			i&= ~(1<<(7-j));   // write 0
+//		}
+//		else i|= (1<<(7-j));  // if the pin is high, write 1
+//		while ((HAL_GPIO_ReadPin (DHT22_PORT, DHT22_PIN)));  // wait for the pin to go low
+//	}
+//
+//	return i;
+//}
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////E
 /* USER CODE END 0 */
 
@@ -198,28 +204,43 @@ int main(void)
     MX_USB_HOST_Process();
 
     /* USER CODE BEGIN 3 */
+
+    if(!mode_select)
+    {
+    	HAL_GPIO_WritePin(LD4_GPIO_Port, LD4_Pin, ((lower_limit - 20) & 0x01));
+    	HAL_GPIO_WritePin(LD6_GPIO_Port, LD6_Pin, ((lower_limit - 20) & 0x02));
+    	HAL_GPIO_WritePin(LD5_GPIO_Port, LD5_Pin, ((lower_limit - 20) & 0x04));
+    }
+    else
+    {
+    	HAL_GPIO_WritePin(LD4_GPIO_Port, LD4_Pin, ((upper_limit - 21) & 0x01));
+    	HAL_GPIO_WritePin(LD6_GPIO_Port, LD6_Pin, ((upper_limit - 21) & 0x02));
+    	HAL_GPIO_WritePin(LD5_GPIO_Port, LD5_Pin, ((upper_limit - 21) & 0x04));
+    }
+
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////B
-    HAL_Delay(100);
-    HAL_UART_Receive_DMA(&huart2, Rx_data, 10);
-    HAL_Delay(100);
-
-    DHT22_Start();
-    Presence = DHT22_Check_Response();
-    Rh_byte1 = DHT22_Read ();
-    Rh_byte2 = DHT22_Read ();
-    Temp_byte1 = DHT22_Read ();
-    Temp_byte2 = DHT22_Read ();
-    SUM = DHT22_Read();
-
-    TEMP = ((Temp_byte1<<8)|Temp_byte2);
-    RH = ((Rh_byte1<<8)|Rh_byte2);
-
-    Temperature = (float) (TEMP/10.0);
-    Humidity = (float) (RH/10.0);
+//    HAL_Delay(100);
+//    HAL_UART_Receive_DMA(&huart2, Rx_data, 10);
+//    HAL_Delay(100);
+//
+//    DHT22_Start();
+//    Presence = DHT22_Check_Response();
+//    Rh_byte1 = DHT22_Read ();
+//    Rh_byte2 = DHT22_Read ();
+//    Temp_byte1 = DHT22_Read ();
+//    Temp_byte2 = DHT22_Read ();
+//    SUM = DHT22_Read();
+//
+//    TEMP = ((Temp_byte1<<8)|Temp_byte2);
+//    RH = ((Rh_byte1<<8)|Rh_byte2);
+//
+//    Temperature = (float) (TEMP/10.0);
+//    Humidity = (float) (RH/10.0);
 
     if(HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_0))
     {
-    	HAL_UART_Transmit (&huart2, "gonderilecek data", sizeof ("gonderilecek data"), 10);
+    	//HAL_UART_Transmit (&huart2, "gonderilecek data", sizeof ("gonderilecek data"), 10);
+    	//__HAL_GPIO_EXTI_GENERATE_SWIT(BUTTON2_Pin);
     }
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////E
   }
@@ -421,7 +442,7 @@ static void MX_DMA_Init(void)
 
   /* DMA interrupt init */
   /* DMA1_Stream5_IRQn interrupt configuration */
-  HAL_NVIC_SetPriority(DMA1_Stream5_IRQn, 0, 0);
+  HAL_NVIC_SetPriority(DMA1_Stream5_IRQn, 1, 0);
   HAL_NVIC_EnableIRQ(DMA1_Stream5_IRQn);
 
 }
@@ -446,7 +467,7 @@ static void MX_GPIO_Init(void)
   __HAL_RCC_GPIOD_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(CS_I2C_SPI_GPIO_Port, CS_I2C_SPI_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOE, CS_I2C_SPI_Pin|RELAY_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(OTG_FS_PowerSwitchOn_GPIO_Port, OTG_FS_PowerSwitchOn_Pin, GPIO_PIN_SET);
@@ -455,12 +476,12 @@ static void MX_GPIO_Init(void)
   HAL_GPIO_WritePin(GPIOD, LD4_Pin|LD3_Pin|LD5_Pin|LD6_Pin
                           |Audio_RST_Pin, GPIO_PIN_RESET);
 
-  /*Configure GPIO pin : CS_I2C_SPI_Pin */
-  GPIO_InitStruct.Pin = CS_I2C_SPI_Pin;
+  /*Configure GPIO pins : CS_I2C_SPI_Pin RELAY_Pin */
+  GPIO_InitStruct.Pin = CS_I2C_SPI_Pin|RELAY_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-  HAL_GPIO_Init(CS_I2C_SPI_GPIO_Port, &GPIO_InitStruct);
+  HAL_GPIO_Init(GPIOE, &GPIO_InitStruct);
 
   /*Configure GPIO pin : OTG_FS_PowerSwitchOn_Pin */
   GPIO_InitStruct.Pin = OTG_FS_PowerSwitchOn_Pin;
@@ -477,11 +498,11 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Alternate = GPIO_AF5_SPI2;
   HAL_GPIO_Init(PDM_OUT_GPIO_Port, &GPIO_InitStruct);
 
-  /*Configure GPIO pin : B1_Pin */
-  GPIO_InitStruct.Pin = B1_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_EVT_RISING;
+  /*Configure GPIO pin : PA0 */
+  GPIO_InitStruct.Pin = GPIO_PIN_0;
+  GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
-  HAL_GPIO_Init(B1_GPIO_Port, &GPIO_InitStruct);
+  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
   /*Configure GPIO pin : BOOT1_Pin */
   GPIO_InitStruct.Pin = BOOT1_Pin;
@@ -518,12 +539,81 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(MEMS_INT2_GPIO_Port, &GPIO_InitStruct);
 
+  /* EXTI interrupt init*/
+  HAL_NVIC_SetPriority(EXTI0_IRQn, 1, 0);
+  HAL_NVIC_EnableIRQ(EXTI0_IRQn);
+
 /* USER CODE BEGIN MX_GPIO_Init_2 */
 /* USER CODE END MX_GPIO_Init_2 */
 }
 
 /* USER CODE BEGIN 4 */
+HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
+{
+	/* interrupt gelen pini kontrol et */
+	if(GPIO_Pin == GPIO_PIN_0)
+	{
+		/* pine art arda basilip basilmadigini kontrol et */
+		if((HAL_GetTick() - tick_counter) > 3000)
+		{
+			/* mode u 0 <-> 1 olarak degistir */
+			mode_select++;
+			if(mode_select > 1)
+			{
+				mode_select = 0;
+			}
+			if(mode_select)
+			{
+				/* turuncu ledi yak */
+				HAL_GPIO_WritePin(LD3_GPIO_Port, LD3_Pin, SET);
+				HAL_Delay(100);
+			}
+			else
+			{
+				/* turuncu ledi sondur */
+				HAL_GPIO_WritePin(LD3_GPIO_Port, LD3_Pin, RESET);
+				HAL_Delay(100);
+			}
+		}
+		else
+		{
+			/* mode == 0 ise*/
+			if(!mode_select)
+			{
+				lower_limit++;
+				if(lower_limit > 27)
+				{
+					lower_limit = 20;
+				}
 
+				/* ust limitin alt limitten uyuk olmasini sagla */
+				if(upper_limit <= lower_limit)
+				{
+					upper_limit = lower_limit + 1;
+				}
+				HAL_Delay(50);
+			}
+			/* mode == 1 ise*/
+			else
+			{
+				upper_limit++;
+				if(upper_limit > 28)
+				{
+					upper_limit = 21;
+				}
+
+				/* alt limitin ust limikten kucuk olmasini sagla */
+				if(upper_limit <= lower_limit)
+				{
+					 lower_limit = upper_limit - 1;
+				}
+				HAL_Delay(50);
+			}
+		}
+		/* tekrardan olcum yapabilmek icin tick i kaydet */
+		tick_counter = HAL_GetTick();
+	}
+}
 /* USER CODE END 4 */
 
 /**
