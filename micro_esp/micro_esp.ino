@@ -24,7 +24,7 @@
  WiFiClient client;  
    
  const char* ssid   = "Room temp manager";// This is the SSID that ESP32 will broadcast  
- const char* password = "stm32stm32";     // password should be atleast 8 characters to make it work  
+ const char* password = "mbsdproject";     // password should be atleast 8 characters to make it work  
    
  // Create the global variable  
  String http;
@@ -49,7 +49,7 @@
   //Serial.println( WiFi.softAPIP() );  
    
   
-  server.begin();                    // Start our ESP32 server  
+  server.begin();// Start our ESP32 server  
 
   delay(1000);
 
@@ -100,7 +100,7 @@
       while(Serial.available())
       {
         pixel.setPixelColor(0, pixel.Color(25, 0, 0));
-          pixel.show();
+        pixel.show();
         int incoming_data = Serial.read();
         if(incoming_data == 97)
         {
@@ -150,7 +150,7 @@
   // Send the whole HTML  
   client.println("<!DOCTYPE html><html>");  
   client.println("<head>");  
-  client.println("<title>ESP32-MCP2515-CANBUS</title>");  
+  client.println("<title>Room temp manager</title>");  
   client.println("</head>");  
     
   
@@ -161,9 +161,7 @@
   {
       // Web Page Heading  
       client.print("<body><h1>Room stats");  
-      //client.print(999, HEX);
       client.println("</h1>");
-  
       client.println("<meta http-equiv=refresh content=0"); //refresh
 
 
@@ -185,9 +183,7 @@
               client.print("off");
             }
             //client.print(combi_state);  
-            
-      
-            //client.print(cbyte.byte);
+           
             client.println("</p>");
           
            
@@ -274,14 +270,6 @@
     send_data = false;
   }
 
-  /*client.print("<p>");
-  client.print("<p>");
-  client.print("<p>");
-  client.print("send data: ");
-  client.println(send_data);
-  client.print("get data: ");
-  client.println(get_data);*/
-  
     
   client.println("</body></html>");  
   client.println();  
